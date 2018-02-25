@@ -1,6 +1,5 @@
 # coding: utf-8
 
-""" Trains an agent with (stochastic) Policy Gradients on Pong. Uses OpenAI Gym. """
 import numpy as np
 import pickle
 import gym
@@ -19,9 +18,6 @@ else:
     model['W1'] = np.random.randn(H) # "Xavier" initialization
     model['W2'] = np.random.randn(H) / np.sqrt(H)
     pickle.dump(model, open('model.p', 'wb'))
-  
-delta_cache = { 'delta_layer1': np.zeros_like(model['W2'])} # delta memory
-grad_cache = { 'grad_layer1': np.zeros_like(model['W2'])} # grad memory
 
 
 def sigmoid(x, deriv = False):
@@ -47,22 +43,30 @@ def prepro(I):
         return 0.5
 
 
-def policy_forward(x, model):
+def policy_forward(x):
     l1 = x * model['W1'] # число * вектор -> вектор
     l1[l1 <= 0] = 0 # ReLU nonlinearity
     l2 = np.dot(model['W2'], l1) # вектор * вектор -> число
     l2 = sigmoid(l2)
-    return l1, l2 # return probability of taking action 2, and hidden state
+    return l1, l2 # return probability of taking action 2
 
 
-def loss_backward(loss, model_W2):
-    delta_layer1 = loss * model_W2 # число * вектор -> вектор
-    return delta_layer1
+def policy_backward(xs, loss, l1s):
+    delta_cache = loss * model['W2']
+    for x in xs:
+        for i in range(H):
+            if (model['W1'][i] > 0):
+                model['W1'][i] += delta_cache * x * learning_rate
+    for l1 in l1s:
+        l2 = np.dot(model['W2'], l1)
+        for i in range(H):
+            model['W2'][i] += loss * learning_rate * l1[i] * sigmoid(l2, deriv = False)
 
-
+        
 env = gym.make("Pong-v0")
 observation = env.reset()
-coords, l1s, l2s = [], [], []
+coords, l1s = [], []
+delta_cache = [] # delta memory
 
 while True:
     if render:
@@ -72,7 +76,7 @@ while True:
     coord = prepro(observation)
 
     # forward the policy network and sample an action from the returned probability
-    l1, l2 = policy_forward(coord, model)
+    l1, l2 = policy_forward(coord)
         
     if (l2 > 0.5):
         action = 2
@@ -82,41 +86,20 @@ while True:
         action = 1
 
     # record various intermediates (needed later for backprop)
-    coords.append(coord) # observation
-    l1s.append(l1) # hidden state        
-    l2s.append(l2)
+    coords.append(coord) # observation      
+    l1s.append(l1)
 
     # step the environment and get new measurements
     observation, reward, done, info = env.step(action)
     
     if (reward != 0): # an episode finished
-
-        loss = reward
-
-        # stack together all inputs, hidden states, action gradients, and rewards for this episode
-        epcoord = np.vstack(coords)
-        epl1 = np.vstack(l1s)
-        epl2 = np.vstack(l2s)
-
-        coords, l1s, l2s = [], [], [] # reset array memory
         
         # robocraft.ru/blog/algorithm/560.html
-        delta_cache['delta_layer1'] = loss_backward(loss, model['W2'])
-        grad_cache[]
-        
-        # edit model
-        model['W1'] += learning_rate * model[k]
+        policy_backward(coords, reward, l1s)
+        pickle.dump(model, open('model.p', 'wb'))
 
-        # perform rmsprop parameter update every episode
-        for k, v in model.iteritems():
-            g = grad_buffer[k] # gradient
-            rmsprop_cache[k] = decay_rate * rmsprop_cache[k] + (1 - decay_rate) * g**2
-            model[k] += learning_rate * g / (np.sqrt(rmsprop_cache[k]) + 1e-5)
-            grad_buffer[k] = np.zeros_like(v) # reset batch gradient buffer
-            pickle.dump(model, open('model.p', 'wb'))
-
+        coords, l1s = [], [] # reset array memory
         observation = env.reset() # reset env
     
-    # Pong has either +1 or -1 reward exactly when game ends.
-    print(('game finished, re+ward: %f' %reward) + ('' if reward == -1 else ' !!!!!!!!'))
-
+        # Pong has either +1 or -1 reward exactly when game ends
+        print(('Game finished, reward: %f' %reward) + ('' if reward == -1 else ' !!!!!!!!'))
