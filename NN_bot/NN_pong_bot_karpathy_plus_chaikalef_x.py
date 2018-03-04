@@ -8,7 +8,7 @@ import gym
 # hyperparameters
 H = 30 # number of hidden layer neurons
 batch_size = 10 # every how many episodes to do a param update?
-learning_rate = 1e-4 # 0.0001 = 1 / 10000
+learning_rate = 3e-3 # 0.003 = 3 / 1000
 gamma = 0.99 # discount factor for reward
 decay_rate = 0.99 # decay factor for RMSProp leaky sum of grad^2
 resume = True # resume from previous checkpoint?
@@ -40,7 +40,7 @@ def prepro(I):
     I = np.transpose(np.nonzero(I))
     
     if (I.size != 0):
-        x = I[1, 0]
+        x = I[0, 0]
         return x / 155.
     else:
         return 0.5
@@ -48,7 +48,7 @@ def prepro(I):
 
 def discount_rewards(r):
     """ take 1D float array of rewards and compute discounted reward """
-    discounted_r = np.zeros_like(r)
+    discounted_r = np.zeros_like(r, dtype=np.float32)  # or np.float64
     running_add = 0
     for t in reversed(range(0, r.size)):
         if r[t] != 0:

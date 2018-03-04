@@ -7,7 +7,7 @@ import gym
 
 # hyperparameters
 H = 30 # number of hidden layer neurons
-learning_rate = 1e-4 # 0.0001 = 1 / 10000
+learning_rate = 3e-3 # 0.003 = 3 / 1000
 resume = True # resume from previous checkpoint?
 render = False
 episode_number = 0
